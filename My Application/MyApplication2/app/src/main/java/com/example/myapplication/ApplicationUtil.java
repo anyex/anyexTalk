@@ -6,13 +6,18 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 public class ApplicationUtil extends Application {
     private Socket socket;
     private DataOutputStream out = null;
     private DataInputStream in = null;
+    private ExecutorService mThreadPool;
 
     public void init() throws IOException ,Exception{
+
         this.socket = new Socket("192.168.1.11",9999);
         this.out = new DataOutputStream(socket.getOutputStream());
         this.in = new DataInputStream(socket.getInputStream());

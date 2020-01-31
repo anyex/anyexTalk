@@ -3,8 +3,8 @@ package com.example.myapplication;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -13,13 +13,17 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintStream;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -33,6 +37,8 @@ public class MainActivity extends AppCompatActivity {
     private Socket socket;
     private Context mContext;
     private ExecutorService mThreadPool;
+    private PrintStream out;
+    private DataInputStream in;
     InputStream is;
     OutputStream outputStream;
     Handler handler;
@@ -40,8 +46,19 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         mContext =this;
 
-        ApplicationUtil applicationUtil = (ApplicationUtil) MainActivity.this.getApplication();
-
+       final ApplicationUtil applicationUtil = (ApplicationUtil) MainActivity.this.getApplication();
+       socket = applicationUtil.getSocket();
+        if(socket != null){
+            System.out.println("SOCKET NO NULL");
+            if(socket.isConnected()){
+                try {
+                    System.out.println("SOCKET CLOSE");
+                    socket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
         handler = new Handler(){
             @Override
             public void handleMessage(@NonNull Message msg) {
@@ -57,6 +74,7 @@ public class MainActivity extends AppCompatActivity {
 
         };
 
+
         mThreadPool = Executors.newCachedThreadPool();
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -71,17 +89,25 @@ public class MainActivity extends AppCompatActivity {
              final String account_ =  account.getText().toString();
              final  String passwd_ = passwd.getText().toString();
                 System.out.println("开始登录");
-
                     mThreadPool.execute(new Runnable() {
                         @Override
                         public void run() {
                             String loginstr ="";
                             try{
-                                socket = new Socket("192.168.1.11",9999);
-                                System.out.println("开始登录2");
+                                applicationUtil.init();
 
-                                System.out.println(socket.isConnected());
+                                in = applicationUtil.getIn();
+                                socket = applicationUtil.getSocket();
+                                out = new PrintStream(socket.getOutputStream());
                             }catch (IOException e){
+                                Message msg = handler.obtainMessage();
+                                msg.what=1;
+                                msg.obj="连接服务器失败";
+                                handler.sendMessage(msg);
+                                e.printStackTrace();
+
+                                return;
+                            }catch (Exception e){
                                 Message msg = handler.obtainMessage();
                                 msg.what=1;
                                 msg.obj="连接服务器失败";
@@ -102,37 +128,38 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
                             try{
-                                outputStream = socket.getOutputStream();
-                                outputStream.write(loginstr.getBytes());
-
-                                outputStream.flush();
-                                socket.shutdownOutput();
+                                out.println(loginstr);
+                                out.flush();
                                 System.out.println("发送消息:"+loginstr);
-
-                                is = socket.getInputStream();
-
-                                StringBuffer out = new StringBuffer();
-                                byte[] b =new byte[4096];
-                                int n;
-                                while ((n=is.read(b))!=-1){
-                                    out.append(new String(b,0,n));
+                                int r = in.available();
+                                while (r == 0){
+                                    r = in.available();
                                 }
-                                Log.v("ABC",out.toString());
-                                System.out.println("收到消息:"+out.toString());
-                                Message msg = handler.obtainMessage();
-                                msg.what=1;
-                                msg.obj=out.toString();
-                                handler.sendMessage(msg);
+                                byte[] b = new byte[r];
+                                in.read(b);
+                                String result = new String(b,"utf-8");
+                                System.out.println("收到消息:"+result);
 
+                                JSONObject res = new JSONObject(result);
+                                res.put("ACCOUNT",account_);
+                                if(res.getInt("LOGIN_STATE") == 1){
+                                    socket.close();
+                                    in.close();
+                                    out.close();
+                                    Log.v("LOGIN","CLOSE");
+                                    Intent intent = new Intent();
+                                    intent.setClass(MainActivity.this,FriendList.class);
+                                    intent.putExtra("LOGIN_RES",res.toString());
 
-                                outputStream.close();
-                                is.close();
-                                socket.close();
+                                    startActivity(intent);
+                                }
                             }
                             catch (UnknownHostException e){
                                 e.printStackTrace();
                             }
                             catch (IOException e){
+                                e.printStackTrace();
+                            } catch (JSONException e) {
                                 e.printStackTrace();
                             }
 
