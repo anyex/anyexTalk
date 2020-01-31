@@ -79,6 +79,17 @@ public class talk_list extends AppCompatActivity {
             @Override
             public void handleMessage(@NonNull Message msg) {
                 super.handleMessage(msg);
+                Log.v("HANDLE","收到消息"+msg.what);
+                try {
+                    JSONObject message = new JSONObject(msg.obj.toString());
+                    String from = message.getString("ME");
+                    String Time = message.getString("TIME");
+                    String msg_ = message.getString("MESSAGE");
+                    String res = from+" "+Time+"\n"+msg_+"\n";
+                    messagelog.append(res);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }
         };
 

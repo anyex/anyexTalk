@@ -19,6 +19,8 @@ import java.net.Socket;
 import android.os.Handler;
 import android.os.Message;
 
+import org.json.JSONObject;
+
 public class SocketThread extends Thread {
     private String ip ="192.168.1.11";
     private int port = 9999;
@@ -106,8 +108,10 @@ public class SocketThread extends Thread {
                 };
                 asyncTask.execute(mess);
 
+                JSONObject sendstat = new JSONObject(mess);
+                sendstat.put("SEND_STAT",1);
                 Message msg = outHandler.obtainMessage();
-                msg.obj = mess;
+                msg.obj = sendstat.toString();
                 msg.what =1;
                 outHandler.sendMessage(msg);
             }else{
